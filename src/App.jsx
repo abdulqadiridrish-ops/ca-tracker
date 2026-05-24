@@ -379,7 +379,7 @@ export default function App() {
               </div>
 
               <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => setStep(1)} style={{ padding: "10px 20px", background: "#E2E8F0", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>← Back</button>
+                <button onClick={() => setStep(1)} style={{ padding: "10px 20px", background: "#E2E8F0", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Refine Strategy</button>
                 <button onClick={runGeneration} style={{ flex: 1, padding: "10px", background: "#10B981", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Compile Live Tracking Engine →</button>
               </div>
             </div>
