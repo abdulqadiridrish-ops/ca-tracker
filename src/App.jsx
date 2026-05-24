@@ -20,6 +20,7 @@ const REV2_FIXED = [
 
 const REV2_START = new Date(2026, 7, 13); // Aug 13
 const PRE_EXAM_START = new Date(2026, 7, 27); // Aug 27
+const REVERSE_TIMER_TARGET = new Date("2026-07-25T00:00:00"); // Target Milestone Anchor
 
 const CLASS_DEADLINES = [
   { label: "30th June", date: new Date(2026, 5, 30) },
@@ -40,8 +41,6 @@ function toD(s) { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 function fmt(d) { return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }); }
-function fmtShort(d) { return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }); }
-function isExamDay(d) { return SUBJECTS.some(s => sameDay(s.exam, d)); }
 function subjName(id) { return SUBJECTS.find(s => s.id === id)?.name || id; }
 function r(n) { return Math.round(n * 10) / 10; }
 
@@ -183,12 +182,18 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 
 // ── MAIN APP COMPONENT ──────────────────────────────────────────────────────
 export default function App() {
-  const today = new Date("2026-05-24"); // Automatically calibrated tracking base
+  const today = new Date("2026-05-24");
 
-  // Persist State Configurations to Local Storage
+  // PERSIST CURRENT STEPS & ENGAGEMENT MATRIX OVER RELOADS
+  const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
   const [spdC, setSpdC] = useState(() => Number(localStorage.getItem("ca_spd")) || 3);
+  const [classOrder, setClassOrder] = useState(() => {
+    const stored = localStorage.getItem("ca_order");
+    return stored ? JSON.parse(stored) : ["aa", "dt", "it", "cl"];
+  });
+  
   const [hours, setHours] = useState(() => {
     const stored = localStorage.getItem("ca_hours");
     return stored ? JSON.parse(stored) : {
@@ -204,24 +209,71 @@ export default function App() {
     return stored ? JSON.parse(stored) : {};
   });
 
-  const [step, setStep] = useState(1);
-  const [classOrder, setClassOrder] = useState(["aa", "dt", "it", "cl"]);
-  const [schedule, setSchedule] = useState(null);
+  const [dailyNotes, setDailyNotes] = useState(() => {
+    const stored = localStorage.getItem("ca_notes");
+    return stored ? JSON.parse(stored) : {};
+  });
 
+  // REAL-TIME REVERSE COUNTDOWN STATE MODULE
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
+
+  // Generate schedule baseline automatically to persist visibility layout
+  const [schedule, setSchedule] = useState(() => {
+    return buildSchedule(hours, startDate, classDL, spdC, classOrder);
+  });
+
+  // COUNTDOWN ENGINE EFFECTS LOOP
   useEffect(() => {
+    function computeTimer() {
+      const now = new Date();
+      const diff = REVERSE_TIMER_TARGET - now;
+      if (diff <= 0) {
+        setTimeLeft(prev => ({ ...prev, isOver: true }));
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / (1000 * 60)) % 60);
+      const secs = Math.floor((diff / 1000) % 60);
+      setTimeLeft({ days, hours, mins, secs, isOver: false });
+    }
+    computeTimer();
+    const interval = setInterval(computeTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // SYNCHRONIZED STORAGE PIPELINE
+  useEffect(() => {
+    localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
     localStorage.setItem("ca_dl", classDL);
     localStorage.setItem("ca_spd", spdC);
     localStorage.setItem("ca_hours", JSON.stringify(hours));
     localStorage.setItem("ca_checked", JSON.stringify(checkedSlots));
-  }, [startDate, classDL, spdC, hours, checkedSlots]);
+    localStorage.setItem("ca_notes", JSON.stringify(dailyNotes));
+    localStorage.setItem("ca_order", JSON.stringify(classOrder));
+  }, [step, startDate, classDL, spdC, hours, checkedSlots, dailyNotes, classOrder]);
 
   function toggleCheck(dayIndex, slotIndex) {
     const key = `${dayIndex}-${slotIndex}`;
     setCheckedSlots(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
-  function setHr(k, v) { setHours(h => ({ ...h, [k]: Math.max(0, Number(v) || 0) })); }
+  function handleNoteChange(dayIndex, val) {
+    setDailyNotes(prev => ({ ...prev, [dayIndex]: val }));
+  }
+
+  function setHr(k, v) { 
+    setHours(h => {
+      const updated = { ...h, [k]: Math.max(0, Number(v) || 0) };
+      return updated;
+    }); 
+  }
+
+  // Live Sync trigger across strategy dashboards
+  useEffect(() => {
+    setSchedule(buildSchedule(hours, startDate, classDL, spdC, classOrder));
+  }, [hours, startDate, classDL, spdC, classOrder]);
 
   // System Math Operations
   const totalC = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_c`] || 0), 0);
@@ -232,81 +284,102 @@ export default function App() {
   const totalR1 = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_r1`] || 0), 0);
   const autoHpdR1 = (totalR1 / rev1Days).toFixed(1);
 
-  const totalR2 = SUBJECTS.filter(s => s.id !== "aa").reduce((s, sub) => s + (hours[`${sub.id}_r2`] || 0), 0);
-  const autoHpdR2 = (totalR2 / 10).toFixed(1);
-
   // Analytical Tracker Math
-  const totalSlotsCount = schedule ? schedule.reduce((acc, current, dIdx) => acc + (current.entries?.length || 0), 0) : 0;
+  const totalSlotsCount = schedule ? schedule.reduce((acc, current) => acc + (current.entries?.length || 0), 0) : 0;
   const totalCheckedCount = Object.values(checkedSlots).filter(Boolean).length;
   const performancePercentage = totalSlotsCount > 0 ? Math.round((totalCheckedCount / totalSlotsCount) * 100) : 0;
 
-  function runGeneration() {
-    const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
-    setSchedule(generated);
-    setStep(3);
-  }
-
   return (
-    <div style={{ backgroundColor: "#F8FAFC", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "12px" }}>
-      <div style={{ maxWidth: "800px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "16px", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
+    <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
+      <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
+        {/* REVERSE COUNTDOWN TIMER BLOCK */}
+        <div style={{ backgroundColor: "#0F172A", padding: "10px 20px", color: "#94A3B8", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1E293B", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ fontSize: "11px", fontWeight: "800", letterSpacing: "0.5px", color: "#38BDF8", textTransform: "uppercase" }}>⏱️ Milestone Countdown Clock :</div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {timeLeft.isOver ? (
+              <span style={{ fontSize: "12px", color: "#F43F5E", fontWeight: "800" }}>Milestone Anchor Met</span>
+            ) : (
+              <div style={{ display: "flex", gap: "8px", fontSize: "12px", color: "#F8FAFC", fontWeight: "700" }}>
+                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.days}</strong>d</span>
+                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.hours}</strong>h</span>
+                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.mins}</strong>m</span>
+                <span style={{ minWidth: "24px" }}><strong style={{ color: "#F43F5E", fontSize: "14px" }}>{timeLeft.secs}</strong>s</span>
+                <span style={{ color: "#64748B", fontWeight: "500" }}>until July 25 Milestone</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* TOP BRAND HEADER */}
-        <div style={{ background: "linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%)", padding: "24px", color: "#fff" }}>
+        <div style={{ background: "linear-gradient(135deg, #4F46E5 0%, #2563EB 100%)", padding: "26px", color: "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", letterSpacing: "-0.5px" }}>⚡ AIR Ranker's Blueprint</h1>
+              <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "800", letterSpacing: "-0.5px" }}>⚡ AIR Ranker's Blueprint</h1>
               <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#E0E7FF", opacity: 0.9 }}>Group 1 Ultimate Inter Prep Suite</p>
             </div>
-            <div style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(4px)", padding: "6px 14px", borderRadius: "99px", fontSize: "12px", fontWeight: "700" }}>
-              Target: Sept 2026 Cycle
+            <div style={{ background: "rgba(255,255,255,0.16)", backdropFilter: "blur(6px)", padding: "6px 14px", borderRadius: "99px", fontSize: "12px", fontWeight: "700" }}>
+              Cycle: Sept 2026 Exams
             </div>
           </div>
 
           {/* Dynamic Tracker Bar */}
-          {schedule && (
-            <div style={{ marginTop: "20px", background: "rgba(0,0,0,0.15)", padding: "12px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", color: "#F3F4F6" }}>My Execution Score:</div>
-              <div style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.2)", height: "8px", borderRadius: "99px", overflow: "hidden" }}>
-                <div style={{ width: `${performancePercentage}%`, backgroundColor: "#10B981", height: "100%", transition: "width 0.4s ease" }} />
-              </div>
-              <div style={{ fontSize: "14px", fontWeight: "800", color: "#34D399" }}>{performancePercentage}%</div>
+          <div style={{ marginTop: "20px", background: "rgba(15,23,42,0.3)", padding: "14px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "14px", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize: "11px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.5px", color: "#E2E8F0" }}>Execution Matrix Score:</div>
+            <div style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.2)", height: "8px", borderRadius: "99px", overflow: "hidden" }}>
+              <div style={{ width: `${performancePercentage}%`, backgroundColor: "#10B981", height: "100%", transition: "width 0.4s ease" }} />
             </div>
-          )}
+            <div style={{ fontSize: "14px", fontWeight: "900", color: "#34D399" }}>{performancePercentage}%</div>
+          </div>
         </div>
 
-        {/* INTERACTIVE NAVIGATION CONTROL TABS */}
-        <div style={{ display: "flex", gap: "4px", background: "#F1F5F9", padding: "6px" }}>
-          {["1. Strategy Dashboard", "2. Lecture Sequence", "3. Active Tracker"].map((label, index) => (
-            <button key={index} onClick={() => { if (index < 2 || schedule) setStep(index + 1); }}
-              style={{ flex: 1, padding: "10px", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "700", cursor: "pointer", transition: "all 0.2s",
-                backgroundColor: step === index + 1 ? "#fff" : "transparent",
-                color: step === index + 1 ? "#4F46E5" : "#64748B",
-                boxShadow: step === index + 1 ? "0 1px 3px rgba(0,0,0,0.05)" : "none",
-                opacity: (index === 2 && !schedule) ? 0.4 : 1 }}>
-              {label}
-            </button>
-          ))}
+        {/* PERSISTENT NAVIGATION ROUTING TABS */}
+        <div style={{ display: "flex", gap: "4px", background: "#F8FAFC", padding: "6px", borderBottom: "1px solid #E2E8F0" }}>
+          {["1. Strategy Dashboard", "2. Lecture Sequence", "3. Active Tracker"].map((label, index) => {
+            const currentTabIdx = index + 1;
+            const isLockedOnTracker = step === 3;
+            // Disable direct tab hopping if locked into Page 3 Active Tracker mode
+            const shouldDisable = isLockedOnTracker && currentTabIdx !== 3;
+
+            return (
+              <button 
+                key={index} 
+                disabled={shouldDisable}
+                onClick={() => setStep(currentTabIdx)}
+                style={{ 
+                  flex: 1, padding: "12px", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: "700", transition: "all 0.2s",
+                  backgroundColor: step === currentTabIdx ? "#fff" : "transparent",
+                  color: step === currentTabIdx ? "#4F46E5" : shouldDisable ? "#CBD5E1" : "#64748B",
+                  boxShadow: step === currentTabIdx ? "0 4px 6px -1px rgba(0,0,0,0.05)" : "none",
+                  cursor: shouldDisable ? "not-allowed" : "pointer",
+                  opacity: shouldDisable ? 0.5 : 1
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ padding: "20px" }}>
+        <div style={{ padding: "24px" }}>
           
           {/* STEP 1 CONTROLS */}
           {step === 1 && (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px", marginBottom: "16px" }}>
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "12px", borderRadius: "10px" }}>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "6px" }}>Start Tracker From</label>
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: "100%", border: "1px solid #CBD5E1", padding: "6px 10px", borderRadius: "6px", fontSize: "13px" }} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px", marginBottom: "18px" }}>
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "14px", borderRadius: "12px" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748B", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.3px" }}>Start Tracker From</label>
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: "100%", border: "1px solid #CBD5E1", padding: "8px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", color: "#1E293B" }} />
                 </div>
 
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "12px", borderRadius: "10px" }}>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "6px" }}>Finish Pending Classes By</label>
-                  <div style={{ display: "flex", gap: "4px" }}>
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "14px", borderRadius: "12px" }}>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748B", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.3px" }}>Finish Pending Classes By</label>
+                  <div style={{ display: "flex", gap: "6px" }}>
                     {CLASS_DEADLINES.map(dl => {
                       const isActive = classDL === dl.date.toISOString().slice(0, 10);
                       return (
                         <button key={dl.label} onClick={() => setClassDL(dl.date.toISOString().slice(0, 10))}
-                          style={{ flex: 1, padding: "6px", border: "none", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer",
+                          style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: "8px", fontSize: "11px", fontWeight: "700", cursor: "pointer", transition: "all 0.15s",
                             backgroundColor: isActive ? "#4F46E5" : "#E2E8F0", color: isActive ? "#fff" : "#334155" }}>{dl.label}</button>
                       );
                     })}
@@ -315,34 +388,34 @@ export default function App() {
               </div>
 
               {/* REAL-TIME CALCULATION CARDS */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "10px", marginBottom: "20px" }}>
-                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", padding: "12px", borderRadius: "10px" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "700", color: "#B45309" }}>CLASSES VELOCITY CAPACITY</div>
-                  <div style={{ fontSize: "18px", fontWeight: "800", color: "#78350F", margin: "2px 0" }}>{autoHpdC} Hours / Day</div>
-                  <div style={{ fontSize: "11px", color: "#B45309" }}>Target: {totalC} Hrs total across {classDays} operational days</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px", marginBottom: "24px" }}>
+                <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", padding: "14px", borderRadius: "12px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "800", color: "#B45309", letterSpacing: "0.3px" }}>CLASSES VELOCITY CAPACITY</div>
+                  <div style={{ fontSize: "20px", fontWeight: "800", color: "#78350F", margin: "4px 0" }}>{autoHpdC} Hours / Day</div>
+                  <div style={{ fontSize: "11px", color: "#D97706", fontWeight: "500" }}>Required: {totalC} Hrs total across {classDays} target days</div>
                 </div>
-                <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", padding: "12px", borderRadius: "10px" }}>
-                  <div style={{ fontSize: "11px", fontWeight: "700", color: "#6D28D9" }}>1ST REVISION COMPRESSION RATIO</div>
-                  <div style={{ fontSize: "18px", fontWeight: "800", color: "#4C1D95", margin: "2px 0" }}>{autoHpdR1} Hours / Day</div>
-                  <div style={{ fontSize: "11px", color: "#6D28D9" }}>Allocated: {totalR1} Hrs total across {rev1Days} active days</div>
+                <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", padding: "14px", borderRadius: "12px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "800", color: "#6D28D9", letterSpacing: "0.3px" }}>1ST REVISION COMPRESSION RATIO</div>
+                  <div style={{ fontSize: "20px", fontWeight: "800", color: "#4C1D95", margin: "4px 0" }}>{autoHpdR1} Hours / Day</div>
+                  <div style={{ fontSize: "11px", color: "#7C3AED", fontWeight: "500" }}>Allocated: {totalR1} Hrs total across {rev1Days} active days</div>
                 </div>
               </div>
 
               {/* SUBJECT HOUR ENTRY CONFIGURATOR */}
-              <div style={{ fontSize: "13px", fontWeight: "700", color: "#334155", marginBottom: "10px", textTransform: "uppercase" }}>Adjust Remaining Targets</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "800", color: "#1E293B", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Adjust Remaining Parameters</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "14px" }}>
                 {SUBJECTS.map(s => (
-                  <div key={s.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderTop: "4px solid #4F46E5", borderRadius: "10px", padding: "14px" }}>
-                    <div style={{ fontWeight: "800", fontSize: "14px", color: "#1E293B" }}>{s.name}</div>
-                    <div style={{ fontSize: "11px", color: "#94A3B8", marginBottom: "12px" }}>Exam Date Anchor: {fmt(s.exam)}</div>
+                  <div key={s.id} style={{ background: "#fff", border: "1px solid #E2E8F0", borderTop: "4px solid #4F46E5", borderRadius: "12px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
+                    <div style={{ fontWeight: "800", fontSize: "15px", color: "#0F172A" }}>{s.name}</div>
+                    <div style={{ fontSize: "11px", color: "#64748B", marginBottom: "14px", fontWeight: "500" }}>Exam Date Anchor: {fmt(s.exam)}</div>
                     
                     {["c", "r1", "r2"].map((phaseKey, pIdx) => (
-                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                        <span style={{ fontSize: "12px", color: "#475569" }}>{["Class Lecture Hours Remaining", "1st Revision Target Allocation", "2nd Revision Crash Allocation"][pIdx]}</span>
+                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "12px", color: "#475569", fontWeight: "500" }}>{["Class Lecture Hours Remaining", "1st Revision Target Allocation", "2nd Revision Crash Allocation"][pIdx]}</span>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <input type="number" value={hours[`${s.id}_${phaseKey}`] || 0} onChange={e => setHr(`${s.id}_${phaseKey}`, e.target.value)}
-                            style={{ width: "55px", textAlign: "center", padding: "4px", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "12px", fontWeight: "700" }} />
-                          <span style={{ fontSize: "11px", color: "#94A3B8" }}>hrs</span>
+                            style={{ width: "60px", textAlign: "center", padding: "6px", border: "1px solid #CBD5E1", borderRadius: "8px", fontSize: "12px", fontWeight: "700", color: "#0F172A" }} />
+                          <span style={{ fontSize: "11px", color: "#94A3B8", fontWeight: "600" }}>hrs</span>
                         </div>
                       </div>
                     ))}
@@ -350,7 +423,7 @@ export default function App() {
                 ))}
               </div>
 
-              <button onClick={() => setStep(2)} style={{ width: "100%", marginTop: "20px", background: "#4F46E5", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: "700", cursor: "pointer" }}>
+              <button onClick={() => setStep(2)} style={{ width: "100%", marginTop: "24px", background: "#4F46E5", color: "#fff", border: "none", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
                 Next: Customize Lecture Discharge Sequence →
               </button>
             </div>
@@ -359,94 +432,110 @@ export default function App() {
           {/* STEP 2 CONTROLS */}
           {step === 2 && (
             <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px" }}>Set Class Subject Discharge Sequence</div>
-              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "16px" }}>Drag-free quick configuration interface. Arrange your daily 3-subject cycling priority order below.</p>
+              <div style={{ fontSize: "15px", fontWeight: "800", color: "#0F172A", marginBottom: "4px" }}>Set Class Subject Discharge Sequence</div>
+              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily 3-subject cycling priority layout order below using the dynamic controllers.</p>
               
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
                 {classOrder.map((id, index) => {
                   const s = SUBJECTS.find(sub => sub.id === id);
                   return (
-                    <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "12px", borderRadius: "8px" }}>
-                      <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#E0E7FF", color: "#4F46E5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", marginRight: "12px" }}>{index + 1}</span>
-                      <span style={{ fontWeight: "700", fontSize: "13px", color: "#1E293B", flex: 1 }}>{s.name}</span>
-                      <div style={{ display: "flex", gap: "4px" }}>
-                        <button disabled={index === 0} onClick={() => { const nextOrder = [...classOrder]; [nextOrder[index - 1], nextOrder[index]] = [nextOrder[index], nextOrder[index - 1]]; setClassOrder(nextOrder); }} style={{ padding: "4px 10px", border: "1px solid #CBD5E1", background: "#fff", borderRadius: "6px", cursor: "pointer" }}>↑</button>
-                        <button disabled={index === classOrder.length - 1} onClick={() => { const nextOrder = [...classOrder]; [nextOrder[index + 1], nextOrder[index]] = [nextOrder[index], nextOrder[index + 1]]; setClassOrder(nextOrder); }} style={{ padding: "4px 10px", border: "1px solid #CBD5E1", background: "#fff", borderRadius: "6px", cursor: "pointer" }}>↓</button>
+                    <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "14px", borderRadius: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <span style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#E0E7FF", color: "#4F46E5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", marginRight: "14px" }}>{index + 1}</span>
+                        <span style={{ fontWeight: "700", fontSize: "14px", color: "#0F172A" }}>{s.name}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button disabled={index === 0} onClick={() => { const nextOrder = [...classOrder]; [nextOrder[index - 1], nextOrder[index]] = [nextOrder[index], nextOrder[index - 1]]; setClassOrder(nextOrder); }} style={{ padding: "6px 12px", border: "1px solid #CBD5E1", background: "#fff", borderRadius: "8px", cursor: index === 0 ? "not-allowed" : "pointer", fontWeight: "600" }}>↑</button>
+                        <button disabled={index === classOrder.length - 1} onClick={() => { const nextOrder = [...classOrder]; [nextOrder[index + 1], nextOrder[index]] = [nextOrder[index], nextOrder[index + 1]]; setClassOrder(nextOrder); }} style={{ padding: "6px 12px", border: "1px solid #CBD5E1", background: "#fff", borderRadius: "8px", cursor: index === classOrder.length - 1 ? "not-allowed" : "pointer", fontWeight: "600" }}>↓</button>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => setStep(1)} style={{ padding: "10px 20px", background: "#E2E8F0", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Refine Strategy</button>
-                <button onClick={runGeneration} style={{ flex: 1, padding: "10px", background: "#10B981", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Compile Live Tracking Engine →</button>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button onClick={() => setStep(1)} style={{ padding: "12px 24px", background: "#E2E8F0", color: "#334155", border: "none", borderRadius: "10px", fontWeight: "700", cursor: "pointer" }}>← Back</button>
+                <button onClick={() => setStep(3)} style={{ flex: 1, padding: "12px", background: "#10B981", color: "#fff", border: "none", borderRadius: "10px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(16,185,129,0.25)" }}>Compile Live Tracking Engine →</button>
               </div>
             </div>
           )}
 
-          {/* STEP 3 ACTIVE TRACKER LIST */}
+          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX) */}
           {step === 3 && schedule && (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: "#1E293B" }}>Active Daily Target Checksheets</div>
-                <button onClick={() => setStep(1)} style={{ padding: "6px 12px", background: "#F1F5F9", border: "1px solid #CBD5E1", borderRadius: "6px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>⚙️ Tweak Targets</button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "800", color: "#0F172A" }}>Active Daily Target Checksheets</div>
+                  <div style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>Dashboard layout configurations are safely locked below.</div>
+                </div>
+                {/* EXPLICIT MODIFY PLAN ENTRY TOGGLE */}
+                <button 
+                  onClick={() => {
+                    if(confirm("Open modification dashboard? This lets you recalibrate velocity timelines and remaining lecture weights.")) {
+                      setStep(1);
+                    }
+                  }} 
+                  style={{ padding: "8px 14px", background: "#fff", border: "1px solid #CBD5E1", borderRadius: "8px", fontSize: "12px", fontWeight: "700", color: "#4F46E5", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
+                >
+                  ⚙️ Modify Plan Layout
+                </button>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {schedule.map((day, dIdx) => {
                   const isExam = day.type === "exam";
                   const isTest = day.type === "test" || day.type === "aimt";
                   
                   if (isExam) {
                     return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "8px", padding: "12px" }}>
+                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", borderTop: "1px solid #FEE2E2", borderBottom: "1px solid #FEE2E2", borderRight: "1px solid #FEE2E2" }}>
                         <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — CRITICAL EXAM VENUE</div>
-                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Intermediate Paper: {day.examSubj?.name}</div>
+                        <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Intermediate Paper: {day.examSubj?.name}</div>
                       </div>
                     );
                   }
 
                   if (isTest) {
                     return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "8px", padding: "12px" }}>
+                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "12px", padding: "14px", borderTop: "1px solid #ECFDF5", borderBottom: "1px solid #ECFDF5", borderRight: "1px solid #ECFDF5" }}>
                         <div style={{ fontSize: "11px", fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>🏁 Evaluative Assessment Milestone</div>
-                        <div style={{ fontSize: "13px", fontWeight: "700", color: "#047857" }}>{day.type === "aimt" ? "🏆 ALL INDIA MOCK TEST (AIMT) ARENA" : "📝 SUBJECT MOCK ASSESSMENT"}: {day.blockLabel}</div>
+                        <div style={{ fontSize: "14px", fontWeight: "700", color: "#047857" }}>{day.type === "aimt" ? "🏆 ALL INDIA MOCK TEST (AIMT) ARENA" : "📝 SUBJECT MOCK ASSESSMENT"}: {day.blockLabel}</div>
                       </div>
                     );
                   }
 
                   return (
-                    <div key={dIdx} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "10px", padding: "14px", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                      <div style={{ fontSize: "13px", fontWeight: "800", color: "#334155", borderBottom: "1px solid #F1F5F9", paddingBottom: "6px", marginBottom: "10px" }}>
+                    <div key={dIdx} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "14px", padding: "16px", boxShadow: "0 4px 6px -1px rgba(15,23,42,0.02)" }}>
+                      <div style={{ fontSize: "14px", fontWeight: "800", color: "#334155", borderBottom: "1px solid #F1F5F9", paddingBottom: "8px", marginBottom: "12px" }}>
                         📅 {fmt(day.date)}
                       </div>
                       
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {/* Operational Checklist Rows */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
                         {day.entries?.map((entry, sIdx) => {
                           const isDone = !!checkedSlots[`${dIdx}-${sIdx}`];
-                          const styleProfile = PHASE_STYLE[entry.phase];
+                          const styleProfile = PHASE_STYLE[entry.phase] || { badge: "#E2E8F0", text: "#334155", bg: "#F8FAFC", border: "#E2E8F0", label: "Revision" };
                           
                           return (
                             <div key={sIdx} onClick={() => toggleCheck(dIdx, sIdx)}
-                              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px", borderRadius: "8px", border: `1px solid ${isDone ? "#D1FAE5" : styleProfile.border}`, backgroundColor: isDone ? "#F0FDF4" : styleProfile.bg, cursor: "pointer", transition: "all 0.15s ease" }}>
+                              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "10px", border: `1px solid ${isDone ? "#A7F3D0" : styleProfile.border}`, backgroundColor: isDone ? "#F0FDF4" : styleProfile.bg, cursor: "pointer", transition: "all 0.15s ease" }}>
                               
                               {/* Custom Styled Interactive Checkbox */}
-                              <div style={{ width: "20px", height: "20px", borderRadius: "6px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s" }}>
-                                {isDone && <span style={{ color: "#fff", fontSize: "11px", fontWeight: "900" }}>✓</span>}
+                              <div style={{ width: "22px", height: "22px", borderRadius: "7px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s flex-shrink-0" }}>
+                                {isDone && <span style={{ color: "#fff", fontSize: "12px", fontWeight: "900" }}>✓</span>}
                               </div>
 
                               <div style={{ flex: 1 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                  <span style={{ fontSize: "10px", fontWeight: "700", background: isDone ? "#A7F3D0" : styleProfile.badge, color: isDone ? "#047857" : styleProfile.text, padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase" }}>{styleProfile.label}</span>
-                                  <span style={{ fontSize: "11px", color: "#64748B" }}>• {entry.slot}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                  <span style={{ fontSize: "10px", fontWeight: "800", background: isDone ? "#A7F3D0" : styleProfile.badge, color: isDone ? "#047857" : styleProfile.text, padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase", letterSpacing: "0.3px" }}>{styleProfile.label}</span>
+                                  <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>• {entry.slot}</span>
                                 </div>
-                                <div style={{ fontSize: "13px", fontWeight: "700", marginTop: "2px", color: isDone ? "#94A3B8" : "#1E293B", textDecoration: isDone ? "line-through" : "none" }}>
+                                <div style={{ fontSize: "14px", fontWeight: "700", marginTop: "3px", color: isDone ? "#94A3B8" : "#0F172A", textDecoration: isDone ? "line-through" : "none" }}>
                                   {subjName(entry.id)}
                                 </div>
                               </div>
 
-                              <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#A7F3D0" : styleProfile.text }}>
+                              <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#10B981" : styleProfile.text }}>
                                 {entry.hrs} hrs
                               </div>
 
@@ -454,6 +543,33 @@ export default function App() {
                           );
                         })}
                       </div>
+
+                      {/* INTEGRATED INTERACTIVE DAILY NOTES MEMO MODULE */}
+                      <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                          📝 End-of-Day Execution Memo:
+                        </div>
+                        <textarea
+                          value={dailyNotes[dIdx] || ""}
+                          onChange={(e) => handleNoteChange(dIdx, e.target.value)}
+                          placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
+                          style={{
+                            width: "100%",
+                            minHeight: "44px",
+                            padding: "8px 10px",
+                            fontSize: "12px",
+                            fontFamily: "inherit",
+                            color: "#334155",
+                            backgroundColor: "#F8FAFC",
+                            border: "1px solid #E2E8F0",
+                            borderRadius: "8px",
+                            resize: "vertical",
+                            outline: "none",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                      </div>
+
                     </div>
                   );
                 })}
