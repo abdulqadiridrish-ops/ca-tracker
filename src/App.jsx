@@ -366,7 +366,7 @@ export default function App() {
                 {classOrder.map((id, index) => {
                   const s = SUBJECTS.find(sub => sub.id === id);
                   return (
-                    <div key={id} style={{ display: "flex", alignItems: "center", justifyBetween: "center", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "12px", borderRadius: "8px" }}>
+                    <div key={id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "12px", borderRadius: "8px" }}>
                       <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#E0E7FF", color: "#4F46E5", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "700", marginRight: "12px" }}>{index + 1}</span>
                       <span style={{ fontWeight: "700", fontSize: "13px", color: "#1E293B", flex: 1 }}>{s.name}</span>
                       <div style={{ display: "flex", gap: "4px" }}>
