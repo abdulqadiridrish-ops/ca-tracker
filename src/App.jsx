@@ -184,7 +184,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // TIMELINE PERSISTENCE LOGIC
+  // SEAMLESS STATE LOADERS WITH LOCALSTORAGE FAILSAFES
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -214,17 +214,27 @@ export default function App() {
     return stored ? JSON.parse(stored) : {};
   });
 
-  // NEW INTERACTIVE TIMER TARGET CONFIGURATION STATE
+  // DYNAMIC REVERSE COUNTDOWN SETTINGS
   const [timerTargetDate, setTimerTargetDate] = useState(() => localStorage.getItem("ca_timer_date") || "2026-07-25");
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // SAFE DYNAMIC SCHEDULE RENDER RESOLUTION
-  const schedule = buildSchedule(hours, startDate, classDL, spdC, classOrder);
+  // INITIALIZE AS EMPTY UNTIL PERSISTED RECONCILIATION LOOPS COMPLETE SAFELY
+  const [schedule, setSchedule] = useState([]);
 
-  // REALTIME REVERSE REFRESH EFFECT MODULE WITH INPUT OVERWRITES
+  // TIMELINE TIMESTAMPS SYNC EXECUTOR
+  useEffect(() => {
+    if (hours && startDate && classDL && classOrder) {
+      const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
+      setSchedule(generated);
+    }
+  }, [hours, startDate, classDL, spdC, classOrder]);
+
+  // SAFELY MOUNT THE LIVE COUNTDOWN ENGINE
   useEffect(() => {
     function computeTimer() {
+      if (!timerTargetDate || !timerTargetTime) return;
+      
       const targetString = `${timerTargetDate}T${timerTargetTime}:00`;
       const targetAnchor = new Date(targetString);
       const now = new Date();
@@ -247,7 +257,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [timerTargetDate, timerTargetTime]);
 
-  // SYSTEM STORAGE PIPELINE SYNC
+  // GLOBAL STATE DATA STORAGE PIPELINE
   useEffect(() => {
     localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
@@ -274,7 +284,7 @@ export default function App() {
     setHours(h => ({ ...h, [k]: Math.max(0, Number(v) || 0) })); 
   }
 
-  // System Math Operations
+  // Metrics Arithmetic
   const totalC = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_c`] || 0), 0);
   const classDays = Math.max(1, Math.round((toD(classDL) - toD(startDate)) / 86400000));
   const autoHpdC = (totalC / classDays).toFixed(1);
@@ -283,7 +293,6 @@ export default function App() {
   const totalR1 = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_r1`] || 0), 0);
   const autoHpdR1 = (totalR1 / rev1Days).toFixed(1);
 
-  // Analytical Tracker Math
   const totalSlotsCount = schedule ? schedule.reduce((acc, current) => acc + (current.entries?.length || 0), 0) : 0;
   const totalCheckedCount = Object.values(checkedSlots).filter(Boolean).length;
   const performancePercentage = totalSlotsCount > 0 ? Math.round((totalCheckedCount / totalSlotsCount) * 100) : 0;
@@ -292,7 +301,7 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY CLOCK) */}
+        {/* REVERSE COUNTDOWN TIMER BLOCK (HIGH VISIBILITY GRID SYSTEM) */}
         <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
             🚀 COUNTDOWN TIMELINE TARGET INDICATOR
@@ -385,12 +394,12 @@ export default function App() {
           {/* STEP 1 CONTROLS */}
           {step === 1 && (
             <div>
-              {/* DYNAMIC TIMER CONFIGURATOR COMPONENT */}
+              {/* INTERACTIVE TIMELINE SELECTOR */}
               <div style={{ background: "#F1F5F9", border: "1px solid #CBD5E1", padding: "14px", borderRadius: "12px", marginBottom: "18px" }}>
                 <div style={{ fontSize: "12px", fontWeight: "800", color: "#1E293B", textTransform: "uppercase", marginBottom: "10px", letterSpacing: "0.3px" }}>⚙️ Configure Countdown Timer Target</div>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <div style={{ flex: 2, minWidth: "160px" }}>
-                    <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "700" }}>Target Target Date</span>
+                    <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "700" }}>Target Date</span>
                     <input type="date" value={timerTargetDate} onChange={e => setTimerTargetDate(e.target.value)} style={{ width: "100%", border: "1px solid #CBD5E1", padding: "8px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginTop: "4px" }} />
                   </div>
                   <div style={{ flex: 1, minWidth: "100px" }}>
@@ -421,7 +430,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* REAL-TIME CALCULATION CARDS */}
+              {/* VELOCITY METRIC CARD TRACKERS */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px", marginBottom: "24px" }}>
                 <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", padding: "14px", borderRadius: "12px" }}>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: "#B45309", letterSpacing: "0.3px" }}>CLASSES VELOCITY CAPACITY</div>
@@ -435,7 +444,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* SUBJECT HOUR ENTRY CONFIGURATOR */}
+              {/* ENTRY FIELD INPUT ROW CONFIGURATIONS */}
               <div style={{ fontSize: "13px", fontWeight: "800", color: "#1E293B", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Adjust Remaining Parameters</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "14px" }}>
                 {SUBJECTS.map(s => (
@@ -494,7 +503,7 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX) */}
+          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX STRUCTURE) */}
           {step === 3 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
@@ -580,7 +589,7 @@ export default function App() {
                           })}
                         </div>
 
-                        {/* DAILY EXECUTION NOTES DRAWERS */}
+                        {/* DAILY LOG NOTES COMPONENT */}
                         <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
                           <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
                             📝 End-of-Day Execution Memo:
