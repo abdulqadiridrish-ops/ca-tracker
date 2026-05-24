@@ -186,7 +186,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // PERSIST LIFE VALUES
+  // PERSIST TIMELINES SAFE
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -218,8 +218,16 @@ export default function App() {
 
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // REVERSE COMPILATION FIX: COMPUTE LIVE DURING THE LOOP BASE
-  const schedule = buildSchedule(hours, startDate, classDL, spdC, classOrder);
+  // INITIALIZE SAFE BLANK CONTAINER ARRAY FOR INITIAL EVALUATION RENDER
+  const [schedule, setSchedule] = useState([]);
+
+  // TRIGGER SYNCED SCHEDULER COMPUTATION SAFELY IN BACKGROUND THREADS
+  useEffect(() => {
+    if (hours && startDate && classDL && classOrder) {
+      const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
+      setSchedule(generated);
+    }
+  }, [hours, startDate, classDL, spdC, classOrder]);
 
   // COUNTDOWN ENGINE EFFECTS LOOP
   useEffect(() => {
@@ -451,7 +459,7 @@ export default function App() {
           )}
 
           {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX) */}
-          {step === 3 && schedule.length > 0 && (
+          {step === 3 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                 <div>
@@ -470,97 +478,103 @@ export default function App() {
                 </button>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {schedule.map((day, dIdx) => {
-                  const isExam = day.type === "exam";
-                  const isTest = day.type === "test" || day.type === "aimt";
-                  
-                  if (isExam) {
-                    return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", border: "1px solid #FEE2E2" }}>
-                        <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — Paper Venue</div>
-                        <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubj?.name}</div>
-                      </div>
-                    );
-                  }
-
-                  if (isTest) {
-                    return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "12px", padding: "14px", border: "1px solid #ECFDF5" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>🏁 Assessment Milestone</div>
-                        <div style={{ fontSize: "14px", fontWeight: "700", color: "#047857" }}>{day.type === "aimt" ? "🏆 ALL INDIA MOCK TEST (AIMT) ARENA" : "📝 SUBJECT MOCK ASSESSMENT"}: {day.blockLabel}</div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={dIdx} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "14px", padding: "16px", boxShadow: "0 4px 6px -1px rgba(15,23,42,0.02)" }}>
-                      <div style={{ fontSize: "14px", fontWeight: "800", color: "#334155", borderBottom: "1px solid #F1F5F9", paddingBottom: "8px", marginBottom: "12px" }}>
-                        📅 {fmt(day.date)}
-                      </div>
-                      
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
-                        {day.entries?.map((entry, sIdx) => {
-                          const isDone = !!checkedSlots[`${dIdx}-${sIdx}`];
-                          const styleProfile = PHASE_STYLE[entry.phase] || { badge: "#E2E8F0", text: "#334155", bg: "#F8FAFC", border: "#E2E8F0", label: "Revision" };
-                          
-                          return (
-                            <div key={sIdx} onClick={() => toggleCheck(dIdx, sIdx)}
-                              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "10px", border: `1px solid ${isDone ? "#A7F3D0" : styleProfile.border}`, backgroundColor: isDone ? "#F0FDF4" : styleProfile.bg, cursor: "pointer", transition: "all 0.15s ease" }}>
-                              
-                              <div style={{ width: "22px", height: "22px", borderRadius: "7px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                {isDone && <span style={{ color: "#fff", fontSize: "12px", fontWeight: "900" }}>✓</span>}
-                              </div>
-
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                                  <span style={{ fontSize: "10px", fontWeight: "800", background: isDone ? "#A7F3D0" : styleProfile.badge, color: isDone ? "#047857" : styleProfile.text, padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase", letterSpacing: "0.3px" }}>{styleProfile.label}</span>
-                                  <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>• {entry.slot}</span>
-                                </div>
-                                <div style={{ fontSize: "14px", fontWeight: "700", marginTop: "3px", color: isDone ? "#94A3B8" : "#0F172A", textDecoration: isDone ? "line-through" : "none" }}>
-                                  {subjName(entry.id)}
-                                </div>
-                              </div>
-
-                              <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#10B981" : styleProfile.text }}>
-                                {entry.hrs} hrs
-                              </div>
-
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* MEMO EXECUTOR CONTAINER */}
-                      <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
-                          📝 End-of-Day Execution Memo:
+              {schedule.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#64748B", fontWeight: "600", fontSize: "14px" }}>
+                  ⏳ Loading ranker engine timeline nodes...
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {schedule.map((day, dIdx) => {
+                    const isExam = day.type === "exam";
+                    const isTest = day.type === "test" || day.type === "aimt";
+                    
+                    if (isExam) {
+                      return (
+                        <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", border: "1px solid #FEE2E2" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — Paper Venue</div>
+                          <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubj?.name}</div>
                         </div>
-                        <textarea
-                          value={dailyNotes[dIdx] || ""}
-                          onChange={(e) => handleNoteChange(dIdx, e.target.value)}
-                          placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
-                          style={{
-                            width: "100%",
-                            minHeight: "44px",
-                            padding: "8px 10px",
-                            fontSize: "12px",
-                            fontFamily: "inherit",
-                            color: "#334155",
-                            backgroundColor: "#F8FAFC",
-                            border: "1px solid #E2E8F0",
-                            borderRadius: "8px",
-                            resize: "vertical",
-                            outline: "none",
-                            boxSizing: "border-box"
-                          }}
-                        />
-                      </div>
+                      );
+                    }
 
-                    </div>
-                  );
-                })}
-              </div>
+                    if (isTest) {
+                      return (
+                        <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "12px", padding: "14px", border: "1px solid #ECFDF5" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>🏁 Assessment Milestone</div>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#047857" }}>{day.type === "aimt" ? "🏆 ALL INDIA MOCK TEST (AIMT) ARENA" : "📝 SUBJECT MOCK ASSESSMENT"}: {day.blockLabel}</div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={dIdx} style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: "14px", padding: "16px", boxShadow: "0 4px 6px -1px rgba(15,23,42,0.02)" }}>
+                        <div style={{ fontSize: "14px", fontWeight: "800", color: "#334155", borderBottom: "1px solid #F1F5F9", paddingBottom: "8px", marginBottom: "12px" }}>
+                          📅 {fmt(day.date)}
+                        </div>
+                        
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+                          {day.entries?.map((entry, sIdx) => {
+                            const isDone = !!checkedSlots[`${dIdx}-${sIdx}`];
+                            const styleProfile = PHASE_STYLE[entry.phase] || { badge: "#E2E8F0", text: "#334155", bg: "#F8FAFC", border: "#E2E8F0", label: "Revision" };
+                            
+                            return (
+                              <div key={sIdx} onClick={() => toggleCheck(dIdx, sIdx)}
+                                style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "10px", border: `1px solid ${isDone ? "#A7F3D0" : styleProfile.border}`, backgroundColor: isDone ? "#F0FDF4" : styleProfile.bg, cursor: "pointer", transition: "all 0.15s ease" }}>
+                                
+                                <div style={{ width: "22px", height: "22px", borderRadius: "7px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  {isDone && <span style={{ color: "#fff", fontSize: "12px", fontWeight: "900" }}>✓</span>}
+                                </div>
+
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: "10px", fontWeight: "800", background: isDone ? "#A7F3D0" : styleProfile.badge, color: isDone ? "#047857" : styleProfile.text, padding: "2px 6px", borderRadius: "4px", textTransform: "uppercase", letterSpacing: "0.3px" }}>{styleProfile.label}</span>
+                                    <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>• {entry.slot}</span>
+                                  </div>
+                                  <div style={{ fontSize: "14px", fontWeight: "700", marginTop: "3px", color: isDone ? "#94A3B8" : "#0F172A", textDecoration: isDone ? "line-through" : "none" }}>
+                                    {subjName(entry.id)}
+                                  </div>
+                                </div>
+
+                                <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#10B981" : styleProfile.text }}>
+                                  {entry.hrs} hrs
+                                </div>
+
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* MEMO MODULE */}
+                        <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
+                            📝 End-of-Day Execution Memo:
+                          </div>
+                          <textarea
+                            value={dailyNotes[dIdx] || ""}
+                            onChange={(e) => handleNoteChange(dIdx, e.target.value)}
+                            placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
+                            style={{
+                              width: "100%",
+                              minHeight: "44px",
+                              padding: "8px 10px",
+                              fontSize: "12px",
+                              fontFamily: "inherit",
+                              color: "#334155",
+                              backgroundColor: "#F8FAFC",
+                              border: "1px solid #E2E8F0",
+                              borderRadius: "8px",
+                              resize: "vertical",
+                              outline: "none",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
