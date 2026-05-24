@@ -184,7 +184,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // SEAMLESS STATE LOADERS WITH LOCALSTORAGE FAILSAFES
+  // TIMELINE PERSISTENCE LOGIC
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -219,18 +219,24 @@ export default function App() {
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // INITIALIZE AS EMPTY UNTIL PERSISTED RECONCILIATION LOOPS COMPLETE SAFELY
-  const [schedule, setSchedule] = useState([]);
+  // DEFINITIVE TRAP FIXED: COMPUTE TIMELINE INSTANTLY AT INITIAL PAINT STATE OVER BLANK ARRAYS
+  const [schedule, setSchedule] = useState(() => {
+    return buildSchedule(
+      JSON.parse(localStorage.getItem("ca_hours")) || { aa_c: 160, aa_r1: 40, aa_r2: 30, cl_c: 0, cl_r1: 30, cl_r2: 20, dt_c: 180, dt_r1: 45, dt_r2: 25, it_c: 110, it_r1: 35, it_r2: 20 },
+      localStorage.getItem("ca_start") || today.toISOString().slice(0, 10),
+      localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10),
+      Number(localStorage.getItem("ca_spd")) || 3,
+      JSON.parse(localStorage.getItem("ca_order")) || ["aa", "dt", "it", "cl"]
+    );
+  });
 
-  // TIMELINE TIMESTAMPS SYNC EXECUTOR
+  // BACKGROUND UPDATE ENGINE FOR DYNAMIC STRDashboard RETRIGGERS
   useEffect(() => {
-    if (hours && startDate && classDL && classOrder) {
-      const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
-      setSchedule(generated);
-    }
+    const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
+    setSchedule(generated);
   }, [hours, startDate, classDL, spdC, classOrder]);
 
-  // SAFELY MOUNT THE LIVE COUNTDOWN ENGINE
+  // MOUNT THE LIVE COUNTDOWN ENGINE
   useEffect(() => {
     function computeTimer() {
       if (!timerTargetDate || !timerTargetTime) return;
@@ -276,6 +282,14 @@ export default function App() {
     setCheckedSlots(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
+  // REVERSE ACTION RESETS FOR CLEAN LOCAL RE-CALIBRATION SWEEPS
+  function triggerResetPlan() {
+    if (confirm("Are you sure you want to completely clear your tracker checksheet markers? This resets execution stats back to 0%.")) {
+      setCheckedSlots({});
+      setStep(1);
+    }
+  }
+
   function handleNoteChange(dayIndex, val) {
     setDailyNotes(prev => ({ ...prev, [dayIndex]: val }));
   }
@@ -284,7 +298,7 @@ export default function App() {
     setHours(h => ({ ...h, [k]: Math.max(0, Number(v) || 0) })); 
   }
 
-  // Metrics Arithmetic
+  // System Math Operations
   const totalC = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_c`] || 0), 0);
   const classDays = Math.max(1, Math.round((toD(classDL) - toD(startDate)) / 86400000));
   const autoHpdC = (totalC / classDays).toFixed(1);
@@ -301,7 +315,7 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK (HIGH VISIBILITY GRID SYSTEM) */}
+        {/* REVERSE COUNTDOWN TIMER BLOCK (HIGH VISIBILITY TRACKING DASHBOARD) */}
         <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
             🚀 COUNTDOWN TIMELINE TARGET INDICATOR
@@ -453,7 +467,7 @@ export default function App() {
                     <div style={{ fontSize: "11px", color: "#64748B", marginBottom: "14px", fontWeight: "500" }}>Exam Date Anchor: {fmt(s.exam)}</div>
                     
                     {["c", "r1", "r2"].map((phaseKey, pIdx) => (
-                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyBetween: "center", marginBottom: "8px" }}>
                         <span style={{ fontSize: "12px", color: "#475569", fontWeight: "500" }}>{["Class Lecture Hours Remaining", "1st Revision Target Allocation", "2nd Revision Crash Allocation"][pIdx]}</span>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <input type="number" value={hours[`${s.id}_${phaseKey}`] || 0} onChange={e => setHr(`${s.id}_${phaseKey}`, e.target.value)}
@@ -511,16 +525,20 @@ export default function App() {
                   <div style={{ fontSize: "14px", fontWeight: "800", color: "#0F172A" }}>Active Daily Target Checksheets</div>
                   <div style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>Dashboard layout configurations are safely locked below.</div>
                 </div>
-                <button 
-                  onClick={() => {
-                    if(confirm("Open modification dashboard? This lets you recalibrate timelines, targets, or custom countdown dates.")) {
-                      setStep(1);
-                    }
-                  }} 
-                  style={{ padding: "8px 14px", background: "#fff", border: "1px solid #CBD5E1", borderRadius: "8px", fontSize: "12px", fontWeight: "700", color: "#4F46E5", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
-                >
-                  ⚙️ Modify Plan Layout
-                </button>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button 
+                    onClick={triggerResetPlan}
+                    style={{ padding: "8px 14px", background: "#FFF1F2", border: "1px solid #FECDD3", borderRadius: "8px", fontSize: "12px", fontWeight: "700", color: "#E11D48", cursor: "pointer" }}
+                  >
+                    🗑️ Reset Matrix
+                  </button>
+                  <button 
+                    onClick={() => setStep(1)} 
+                    style={{ padding: "8px 14px", background: "#fff", border: "1px solid #CBD5E1", borderRadius: "8px", fontSize: "12px", fontWeight: "700", color: "#4F46E5", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
+                  >
+                    ⚙️ Modify Plan Layout
+                  </button>
+                </div>
               </div>
 
               {schedule.length === 0 ? (
