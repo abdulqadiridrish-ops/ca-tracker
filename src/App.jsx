@@ -41,11 +41,13 @@ function toD(s) { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 function fmt(d) { return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }); }
+function isExamDay(d) { return SUBJECTS.some(s => sameDay(s.exam, d)); }
 function subjName(id) { return SUBJECTS.find(s => s.id === id)?.name || id; }
 function r(n) { return Math.round(n * 10) / 10; }
 
 // ── SCHEDULER ENGINE ────────────────────────────────────────────────────────
 function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
+  if (!hours || !startStr || !classDL || !classOrder) return [];
   const start = toD(startStr);
   const classDead = toD(classDL);
   const activeIds = new Set(SUBJECTS.map(s => s.id));
@@ -184,7 +186,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // PERSIST CURRENT STEPS & ENGAGEMENT MATRIX OVER RELOADS
+  // PERSIST LIFE VALUES
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -214,13 +216,10 @@ export default function App() {
     return stored ? JSON.parse(stored) : {};
   });
 
-  // REAL-TIME REVERSE COUNTDOWN STATE MODULE
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // Generate schedule baseline automatically to persist visibility layout
-  const [schedule, setSchedule] = useState(() => {
-    return buildSchedule(hours, startDate, classDL, spdC, classOrder);
-  });
+  // REVERSE COMPILATION FIX: COMPUTE LIVE DURING THE LOOP BASE
+  const schedule = buildSchedule(hours, startDate, classDL, spdC, classOrder);
 
   // COUNTDOWN ENGINE EFFECTS LOOP
   useEffect(() => {
@@ -264,16 +263,8 @@ export default function App() {
   }
 
   function setHr(k, v) { 
-    setHours(h => {
-      const updated = { ...h, [k]: Math.max(0, Number(v) || 0) };
-      return updated;
-    }); 
+    setHours(h => ({ ...h, [k]: Math.max(0, Number(v) || 0) })); 
   }
-
-  // Live Sync trigger across strategy dashboards
-  useEffect(() => {
-    setSchedule(buildSchedule(hours, startDate, classDL, spdC, classOrder));
-  }, [hours, startDate, classDL, spdC, classOrder]);
 
   // System Math Operations
   const totalC = SUBJECTS.reduce((s, sub) => s + (hours[`${sub.id}_c`] || 0), 0);
@@ -338,7 +329,6 @@ export default function App() {
           {["1. Strategy Dashboard", "2. Lecture Sequence", "3. Active Tracker"].map((label, index) => {
             const currentTabIdx = index + 1;
             const isLockedOnTracker = step === 3;
-            // Disable direct tab hopping if locked into Page 3 Active Tracker mode
             const shouldDisable = isLockedOnTracker && currentTabIdx !== 3;
 
             return (
@@ -424,7 +414,7 @@ export default function App() {
               </div>
 
               <button onClick={() => setStep(2)} style={{ width: "100%", marginTop: "24px", background: "#4F46E5", color: "#fff", border: "none", padding: "14px", borderRadius: "10px", fontSize: "14px", fontWeight: "700", cursor: "pointer", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-                Next: Customize Lecture Discharge Sequence →
+                Next: Customize Lecture Sequence →
               </button>
             </div>
           )}
@@ -433,7 +423,7 @@ export default function App() {
           {step === 2 && (
             <div>
               <div style={{ fontSize: "15px", fontWeight: "800", color: "#0F172A", marginBottom: "4px" }}>Set Class Subject Discharge Sequence</div>
-              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily 3-subject cycling priority layout order below using the dynamic controllers.</p>
+              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily subject cycling priority layout order below using the dynamic controllers.</p>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
                 {classOrder.map((id, index) => {
@@ -461,14 +451,13 @@ export default function App() {
           )}
 
           {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX) */}
-          {step === 3 && schedule && (
+          {step === 3 && schedule.length > 0 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                 <div>
                   <div style={{ fontSize: "14px", fontWeight: "800", color: "#0F172A" }}>Active Daily Target Checksheets</div>
                   <div style={{ fontSize: "11px", color: "#64748B", fontWeight: "500" }}>Dashboard layout configurations are safely locked below.</div>
                 </div>
-                {/* EXPLICIT MODIFY PLAN ENTRY TOGGLE */}
                 <button 
                   onClick={() => {
                     if(confirm("Open modification dashboard? This lets you recalibrate velocity timelines and remaining lecture weights.")) {
@@ -488,17 +477,17 @@ export default function App() {
                   
                   if (isExam) {
                     return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", borderTop: "1px solid #FEE2E2", borderBottom: "1px solid #FEE2E2", borderRight: "1px solid #FEE2E2" }}>
-                        <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — CRITICAL EXAM VENUE</div>
-                        <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Intermediate Paper: {day.examSubj?.name}</div>
+                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", border: "1px solid #FEE2E2" }}>
+                        <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — Paper Venue</div>
+                        <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubj?.name}</div>
                       </div>
                     );
                   }
 
                   if (isTest) {
                     return (
-                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "12px", padding: "14px", borderTop: "1px solid #ECFDF5", borderBottom: "1px solid #ECFDF5", borderRight: "1px solid #ECFDF5" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>🏁 Evaluative Assessment Milestone</div>
+                      <div key={dIdx} style={{ background: "linear-gradient(90deg, #ECFDF5 0%, #FFFFFF 100%)", borderLeft: "6px solid #10B981", borderRadius: "12px", padding: "14px", border: "1px solid #ECFDF5" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "800", color: "#065F46", textTransform: "uppercase" }}>🏁 Assessment Milestone</div>
                         <div style={{ fontSize: "14px", fontWeight: "700", color: "#047857" }}>{day.type === "aimt" ? "🏆 ALL INDIA MOCK TEST (AIMT) ARENA" : "📝 SUBJECT MOCK ASSESSMENT"}: {day.blockLabel}</div>
                       </div>
                     );
@@ -510,7 +499,6 @@ export default function App() {
                         📅 {fmt(day.date)}
                       </div>
                       
-                      {/* Operational Checklist Rows */}
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
                         {day.entries?.map((entry, sIdx) => {
                           const isDone = !!checkedSlots[`${dIdx}-${sIdx}`];
@@ -520,8 +508,7 @@ export default function App() {
                             <div key={sIdx} onClick={() => toggleCheck(dIdx, sIdx)}
                               style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", borderRadius: "10px", border: `1px solid ${isDone ? "#A7F3D0" : styleProfile.border}`, backgroundColor: isDone ? "#F0FDF4" : styleProfile.bg, cursor: "pointer", transition: "all 0.15s ease" }}>
                               
-                              {/* Custom Styled Interactive Checkbox */}
-                              <div style={{ width: "22px", height: "22px", borderRadius: "7px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s flex-shrink-0" }}>
+                              <div style={{ width: "22px", height: "22px", borderRadius: "7px", border: `2px solid ${isDone ? "#10B981" : "#CBD5E1"}`, backgroundColor: isDone ? "#10B981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                 {isDone && <span style={{ color: "#fff", fontSize: "12px", fontWeight: "900" }}>✓</span>}
                               </div>
 
@@ -544,9 +531,9 @@ export default function App() {
                         })}
                       </div>
 
-                      {/* INTEGRATED INTERACTIVE DAILY NOTES MEMO MODULE */}
+                      {/* MEMO EXECUTOR CONTAINER */}
                       <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
                           📝 End-of-Day Execution Memo:
                         </div>
                         <textarea
