@@ -20,7 +20,6 @@ const REV2_FIXED = [
 
 const REV2_START = new Date(2026, 7, 13); // Aug 13
 const PRE_EXAM_START = new Date(2026, 7, 27); // Aug 27
-const REVERSE_TIMER_TARGET = new Date("2026-07-25T00:00:00"); // Target Milestone Anchor
 
 const CLASS_DEADLINES = [
   { label: "30th June", date: new Date(2026, 5, 30) },
@@ -41,7 +40,6 @@ function toD(s) { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 function fmt(d) { return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }); }
-function isExamDay(d) { return SUBJECTS.some(s => sameDay(s.exam, d)); }
 function subjName(id) { return SUBJECTS.find(s => s.id === id)?.name || id; }
 function r(n) { return Math.round(n * 10) / 10; }
 
@@ -186,7 +184,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // PERSIST TIMELINES SAFE
+  // TIMELINE PERSISTENCE LOGIC
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -216,40 +214,40 @@ export default function App() {
     return stored ? JSON.parse(stored) : {};
   });
 
+  // NEW INTERACTIVE TIMER TARGET CONFIGURATION STATE
+  const [timerTargetDate, setTimerTargetDate] = useState(() => localStorage.getItem("ca_timer_date") || "2026-07-25");
+  const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // INITIALIZE SAFE BLANK CONTAINER ARRAY FOR INITIAL EVALUATION RENDER
-  const [schedule, setSchedule] = useState([]);
+  // SAFE DYNAMIC SCHEDULE RENDER RESOLUTION
+  const schedule = buildSchedule(hours, startDate, classDL, spdC, classOrder);
 
-  // TRIGGER SYNCED SCHEDULER COMPUTATION SAFELY IN BACKGROUND THREADS
-  useEffect(() => {
-    if (hours && startDate && classDL && classOrder) {
-      const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
-      setSchedule(generated);
-    }
-  }, [hours, startDate, classDL, spdC, classOrder]);
-
-  // COUNTDOWN ENGINE EFFECTS LOOP
+  // REALTIME REVERSE REFRESH EFFECT MODULE WITH INPUT OVERWRITES
   useEffect(() => {
     function computeTimer() {
+      const targetString = `${timerTargetDate}T${timerTargetTime}:00`;
+      const targetAnchor = new Date(targetString);
       const now = new Date();
-      const diff = REVERSE_TIMER_TARGET - now;
-      if (diff <= 0) {
-        setTimeLeft(prev => ({ ...prev, isOver: true }));
+      const diff = targetAnchor - now;
+
+      if (isNaN(targetAnchor.getTime()) || diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, mins: 0, secs: 0, isOver: true });
         return;
       }
+
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
       const mins = Math.floor((diff / (1000 * 60)) % 60);
       const secs = Math.floor((diff / 1000) % 60);
       setTimeLeft({ days, hours, mins, secs, isOver: false });
     }
+
     computeTimer();
     const interval = setInterval(computeTimer, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timerTargetDate, timerTargetTime]);
 
-  // SYNCHRONIZED STORAGE PIPELINE
+  // SYSTEM STORAGE PIPELINE SYNC
   useEffect(() => {
     localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
@@ -259,7 +257,9 @@ export default function App() {
     localStorage.setItem("ca_checked", JSON.stringify(checkedSlots));
     localStorage.setItem("ca_notes", JSON.stringify(dailyNotes));
     localStorage.setItem("ca_order", JSON.stringify(classOrder));
-  }, [step, startDate, classDL, spdC, hours, checkedSlots, dailyNotes, classOrder]);
+    localStorage.setItem("ca_timer_date", timerTargetDate);
+    localStorage.setItem("ca_timer_time", timerTargetTime);
+  }, [step, startDate, classDL, spdC, hours, checkedSlots, dailyNotes, classOrder, timerTargetDate, timerTargetTime]);
 
   function toggleCheck(dayIndex, slotIndex) {
     const key = `${dayIndex}-${slotIndex}`;
@@ -292,21 +292,42 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK */}
-        <div style={{ backgroundColor: "#0F172A", padding: "10px 20px", color: "#94A3B8", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1E293B", flexWrap: "wrap", gap: "8px" }}>
-          <div style={{ fontSize: "11px", fontWeight: "800", letterSpacing: "0.5px", color: "#38BDF8", textTransform: "uppercase" }}>⏱️ Milestone Countdown Clock :</div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY CLOCK) */}
+        <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
+          <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
+            🚀 COUNTDOWN TIMELINE TARGET INDICATOR
+          </div>
+          
+          <div style={{ display: "flex", justifyContent: "center", gap: "16px", flexWrap: "wrap", margin: "4px 0" }}>
             {timeLeft.isOver ? (
-              <span style={{ fontSize: "12px", color: "#F43F5E", fontWeight: "800" }}>Milestone Anchor Met</span>
+              <div style={{ fontSize: "28px", color: "#F43F5E", fontWeight: "900", letterSpacing: "-0.5px" }}>🏁 TARGET DESTINATION REACHED</div>
             ) : (
-              <div style={{ display: "flex", gap: "8px", fontSize: "12px", color: "#F8FAFC", fontWeight: "700" }}>
-                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.days}</strong>d</span>
-                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.hours}</strong>h</span>
-                <span><strong style={{ color: "#38BDF8", fontSize: "14px" }}>{timeLeft.mins}</strong>m</span>
-                <span style={{ minWidth: "24px" }}><strong style={{ color: "#F43F5E", fontSize: "14px" }}>{timeLeft.secs}</strong>s</span>
-                <span style={{ color: "#64748B", fontWeight: "500" }}>until July 25 Milestone</span>
+              <div style={{ display: "flex", gap: "14px", alignItems: "center", fontSize: "16px", color: "#94A3B8", fontWeight: "700" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: "32px", fontWeight: "900", color: "#38BDF8", lineHeight: "1" }}>{timeLeft.days}</span>
+                  <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748B", marginTop: "4px" }}>Days</span>
+                </div>
+                <span style={{ fontSize: "24px", color: "#475569", alignSelf: "flex-start", marginTop: "-2px" }}>:</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: "32px", fontWeight: "900", color: "#38BDF8", lineHeight: "1" }}>{timeLeft.hours}</span>
+                  <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748B", marginTop: "4px" }}>Hrs</span>
+                </div>
+                <span style={{ fontSize: "24px", color: "#475569", alignSelf: "flex-start", marginTop: "-2px" }}>:</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: "32px", fontWeight: "900", color: "#38BDF8", lineHeight: "1" }}>{timeLeft.mins}</span>
+                  <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748B", marginTop: "4px" }}>Mins</span>
+                </div>
+                <span style={{ fontSize: "24px", color: "#475569", alignSelf: "flex-start", marginTop: "-2px" }}>:</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "40px" }}>
+                  <span style={{ fontSize: "32px", fontWeight: "900", color: "#EF4444", lineHeight: "1" }}>{timeLeft.secs}</span>
+                  <span style={{ fontSize: "10px", textTransform: "uppercase", color: "#64748B", marginTop: "4px" }}>Secs</span>
+                </div>
               </div>
             )}
+          </div>
+          
+          <div style={{ fontSize: "11px", color: "#64748B", fontWeight: "600" }}>
+            Target Anchor Locked: {timerTargetDate} at {timerTargetTime}
           </div>
         </div>
 
@@ -364,6 +385,21 @@ export default function App() {
           {/* STEP 1 CONTROLS */}
           {step === 1 && (
             <div>
+              {/* DYNAMIC TIMER CONFIGURATOR COMPONENT */}
+              <div style={{ background: "#F1F5F9", border: "1px solid #CBD5E1", padding: "14px", borderRadius: "12px", marginBottom: "18px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "800", color: "#1E293B", textTransform: "uppercase", marginBottom: "10px", letterSpacing: "0.3px" }}>⚙️ Configure Countdown Timer Target</div>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 2, minWidth: "160px" }}>
+                    <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "700" }}>Target Target Date</span>
+                    <input type="date" value={timerTargetDate} onChange={e => setTimerTargetDate(e.target.value)} style={{ width: "100%", border: "1px solid #CBD5E1", padding: "8px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginTop: "4px" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: "100px" }}>
+                    <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "700" }}>Exact Target Time</span>
+                    <input type="time" value={timerTargetTime} onChange={e => setTimerTargetTime(e.target.value)} style={{ width: "100%", border: "1px solid #CBD5E1", padding: "8px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", marginTop: "4px" }} />
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px", marginBottom: "18px" }}>
                 <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", padding: "14px", borderRadius: "12px" }}>
                   <label style={{ display: "block", fontSize: "11px", fontWeight: "800", color: "#64748B", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.3px" }}>Start Tracker From</label>
@@ -468,7 +504,7 @@ export default function App() {
                 </div>
                 <button 
                   onClick={() => {
-                    if(confirm("Open modification dashboard? This lets you recalibrate velocity timelines and remaining lecture weights.")) {
+                    if(confirm("Open modification dashboard? This lets you recalibrate timelines, targets, or custom countdown dates.")) {
                       setStep(1);
                     }
                   }} 
@@ -544,7 +580,7 @@ export default function App() {
                           })}
                         </div>
 
-                        {/* MEMO MODULE */}
+                        {/* DAILY EXECUTION NOTES DRAWERS */}
                         <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
                           <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
                             📝 End-of-Day Execution Memo:
