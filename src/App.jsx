@@ -184,7 +184,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // TIMELINE PERSISTENCE LOGIC
+  // PERSIST TIMELINES SAFE
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -219,7 +219,7 @@ export default function App() {
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // DEFINITIVE TRAP FIXED: COMPUTE TIMELINE INSTANTLY AT INITIAL PAINT STATE OVER BLANK ARRAYS
+  // TRAP RE-CHECK ELIMINATION: INJECT DATA RIGHT AT MOUNT SO STATE NEVER MAPS OVER VACANT CHUNKS
   const [schedule, setSchedule] = useState(() => {
     return buildSchedule(
       JSON.parse(localStorage.getItem("ca_hours")) || { aa_c: 160, aa_r1: 40, aa_r2: 30, cl_c: 0, cl_r1: 30, cl_r2: 20, dt_c: 180, dt_r1: 45, dt_r2: 25, it_c: 110, it_r1: 35, it_r2: 20 },
@@ -230,7 +230,7 @@ export default function App() {
     );
   });
 
-  // BACKGROUND UPDATE ENGINE FOR DYNAMIC STRDashboard RETRIGGERS
+  // METRICS UPDATE WORKER LOOP
   useEffect(() => {
     const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
     setSchedule(generated);
@@ -263,7 +263,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [timerTargetDate, timerTargetTime]);
 
-  // GLOBAL STATE DATA STORAGE PIPELINE
+  // STATE VALUE AUTOMATION CACHE PIPELINE
   useEffect(() => {
     localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
@@ -282,7 +282,6 @@ export default function App() {
     setCheckedSlots(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
-  // REVERSE ACTION RESETS FOR CLEAN LOCAL RE-CALIBRATION SWEEPS
   function triggerResetPlan() {
     if (confirm("Are you sure you want to completely clear your tracker checksheet markers? This resets execution stats back to 0%.")) {
       setCheckedSlots({});
@@ -315,7 +314,7 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK (HIGH VISIBILITY TRACKING DASHBOARD) */}
+        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY MATRIX) */}
         <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
             🚀 COUNTDOWN TIMELINE TARGET INDICATOR
@@ -467,7 +466,7 @@ export default function App() {
                     <div style={{ fontSize: "11px", color: "#64748B", marginBottom: "14px", fontWeight: "500" }}>Exam Date Anchor: {fmt(s.exam)}</div>
                     
                     {["c", "r1", "r2"].map((phaseKey, pIdx) => (
-                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyBetween: "center", marginBottom: "8px" }}>
+                      <div key={phaseKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                         <span style={{ fontSize: "12px", color: "#475569", fontWeight: "500" }}>{["Class Lecture Hours Remaining", "1st Revision Target Allocation", "2nd Revision Crash Allocation"][pIdx]}</span>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <input type="number" value={hours[`${s.id}_${phaseKey}`] || 0} onChange={e => setHr(`${s.id}_${phaseKey}`, e.target.value)}
@@ -490,7 +489,7 @@ export default function App() {
           {step === 2 && (
             <div>
               <div style={{ fontSize: "15px", fontWeight: "800", color: "#0F172A", marginBottom: "4px" }}>Set Class Subject Discharge Sequence</div>
-              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily subject cycling priority layout order below using the dynamic controllers.</p>
+              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily subject cycling priority order below using the dynamic controllers.</p>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
                 {classOrder.map((id, index) => {
@@ -517,7 +516,7 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX STRUCTURE) */}
+          {/* STEP 3 ACTIVE TRACKER LIST */}
           {step === 3 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
@@ -600,46 +599,46 @@ export default function App() {
 
                                 <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#10B981" : styleProfile.text }}>
                                   {entry.hrs} hrs
-                                </div>
-
                               </div>
-                            );
-                          })}
-                        </div>
 
-                        {/* DAILY LOG NOTES COMPONENT */}
-                        <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
-                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
-                            📝 End-of-Day Execution Memo:
-                          </div>
-                          <textarea
-                            value={dailyNotes[dIdx] || ""}
-                            onChange={(e) => handleNoteChange(dIdx, e.target.value)}
-                            placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
-                            style={{
-                              width: "100%",
-                              minHeight: "44px",
-                              padding: "8px 10px",
-                              fontSize: "12px",
-                              fontFamily: "inherit",
-                              color: "#334155",
-                              backgroundColor: "#F8FAFC",
-                              border: "1px solid #E2E8F0",
-                              borderRadius: "8px",
-                              resize: "vertical",
-                              outline: "none",
-                              boxSizing: "border-box"
-                            }}
-                          />
-                        </div>
-
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+
+                      {/* DAILY LOG NOTES COMPONENT */}
+                      <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
+                          📝 End-of-Day Execution Memo:
+                        </div>
+                        <textarea
+                          value={dailyNotes[dIdx] || ""}
+                          onChange={(e) => handleNoteChange(dIdx, e.target.value)}
+                          placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
+                          style={{
+                            width: "100%",
+                            minHeight: "44px",
+                            padding: "8px 10px",
+                            fontSize: "12px",
+                            fontFamily: "inherit",
+                            color: "#334155",
+                            backgroundColor: "#F8FAFC",
+                            border: "1px solid #E2E8F0",
+                            borderRadius: "8px",
+                            resize: "vertical",
+                            outline: "none",
+                            boxSizing: "border-box"
+                          }}
+                        />
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         </div>
       </div>
