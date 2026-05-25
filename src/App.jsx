@@ -35,11 +35,12 @@ const PHASE_STYLE = {
   r2: { badge: "#D1FAE5", text: "#064E3B", bg: "#F4FDF9", border: "#A7F3D0", label: "2nd Revision (Fixed)" },
 };
 
-// Utility Helper Functions
+// ── UTILITY HELPER FUNCTIONS (DEFINED FIRST TO ELIMINATE HOISTING TRAPS) ─────
 function toD(s) { const d = new Date(s); d.setHours(0, 0, 0, 0); return d; }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 function fmt(d) { return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }); }
+function isExamDay(d) { return SUBJECTS.some(s => sameDay(s.exam, d)); }
 function subjName(id) { return SUBJECTS.find(s => s.id === id)?.name || id; }
 function r(n) { return Math.round(n * 10) / 10; }
 
@@ -219,7 +220,7 @@ export default function App() {
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // COMPUTING DATA MATRIX DIRECTLY INSIDE SEED INITIALIZATION LOOP
+  // SEED MATRIX TIMELINE ON LOAD SAFELY
   const [schedule, setSchedule] = useState(() => {
     return buildSchedule(
       JSON.parse(localStorage.getItem("ca_hours")) || { aa_c: 160, aa_r1: 40, aa_r2: 30, cl_c: 0, cl_r1: 30, cl_r2: 20, dt_c: 180, dt_r1: 45, dt_r2: 25, it_c: 110, it_r1: 35, it_r2: 20 },
@@ -314,7 +315,7 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY CLOCK MATRIX) */}
+        {/* REVERSE COUNTDOWN TIMER BLOCK */}
         <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
             🚀 COUNTDOWN TIMELINE TARGET INDICATOR
@@ -516,7 +517,7 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX STRUCTURE) */}
+          {/* STEP 3 ACTIVE TRACKER LIST */}
           {step === 3 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
