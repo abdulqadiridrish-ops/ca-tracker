@@ -184,7 +184,7 @@ function buildSchedule(hours, startStr, classDL, spdC, classOrder) {
 export default function App() {
   const today = new Date("2026-05-24");
 
-  // PERSIST TIMELINES SAFE
+  // SEAMLESS STATE LOADERS WITH LOCALSTORAGE FAILSAFES
   const [step, setStep] = useState(() => Number(localStorage.getItem("ca_step_lock")) || 1);
   const [startDate, setStartDate] = useState(() => localStorage.getItem("ca_start") || today.toISOString().slice(0, 10));
   const [classDL, setClassDL] = useState(() => localStorage.getItem("ca_dl") || CLASS_DEADLINES[1].date.toISOString().slice(0, 10));
@@ -219,7 +219,7 @@ export default function App() {
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // FIXED MOUNT SCHEDULER SEED INITIALIZER
+  // COMPUTING DATA MATRIX DIRECTLY INSIDE SEED INITIALIZATION LOOP
   const [schedule, setSchedule] = useState(() => {
     return buildSchedule(
       JSON.parse(localStorage.getItem("ca_hours")) || { aa_c: 160, aa_r1: 40, aa_r2: 30, cl_c: 0, cl_r1: 30, cl_r2: 20, dt_c: 180, dt_r1: 45, dt_r2: 25, it_c: 110, it_r1: 35, it_r2: 20 },
@@ -230,7 +230,7 @@ export default function App() {
     );
   });
 
-  // METRICS BACKGROUND WORKER LOOP
+  // REALTIME SYNCRONIZER
   useEffect(() => {
     const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
     setSchedule(generated);
@@ -263,7 +263,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [timerTargetDate, timerTargetTime]);
 
-  // LOCAL CACHE PIPELINE SYNC
+  // SYSTEM STORAGE SEAMLESS PIPELINE
   useEffect(() => {
     localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
@@ -314,7 +314,7 @@ export default function App() {
     <div style={{ backgroundColor: "#F1F5F9", minHeight: "100vh", fontFamily: "system-ui, sans-serif", padding: "14px" }}>
       <div style={{ maxWidth: "840px", margin: "0 auto", backgroundColor: "#fff", borderRadius: "20px", boxShadow: "0 20px 40px -15px rgba(15,23,42,0.08)", border: "1px solid #E2E8F0", overflow: "hidden" }}>
         
-        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY MATRIX) */}
+        {/* REVERSE COUNTDOWN TIMER BLOCK (UPGRADED MASSIVE DISPLAY CLOCK MATRIX) */}
         <div style={{ backgroundColor: "#0F172A", padding: "24px 20px", color: "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "2px solid #334155", gap: "10px", textAlign: "center" }}>
           <div style={{ fontSize: "12px", fontWeight: "800", letterSpacing: "1px", color: "#38BDF8", textTransform: "uppercase" }}>
             🚀 COUNTDOWN TIMELINE TARGET INDICATOR
@@ -516,7 +516,7 @@ export default function App() {
             </div>
           )}
 
-          {/* STEP 3 ACTIVE TRACKER LIST */}
+          {/* STEP 3 ACTIVE TRACKER LIST (LOCKED MATRIX STRUCTURE) */}
           {step === 3 && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", background: "#F8FAFC", padding: "12px 16px", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
@@ -554,7 +554,7 @@ export default function App() {
                       return (
                         <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", border: "1px solid #FEE2E2" }}>
                           <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — Paper Venue</div>
-                          <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubj?.name}</div>
+                          <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubY ? day.examSubj.name : subjName(day.examSubj?.id)}</div>
                         </div>
                       );
                     }
