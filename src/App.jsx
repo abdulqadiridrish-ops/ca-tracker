@@ -219,7 +219,7 @@ export default function App() {
   const [timerTargetTime, setTimerTargetTime] = useState(() => localStorage.getItem("ca_timer_time") || "00:00");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, mins: 0, secs: 0, isOver: false });
 
-  // TRAP RE-CHECK ELIMINATION: INJECT DATA RIGHT AT MOUNT SO STATE NEVER MAPS OVER VACANT CHUNKS
+  // FIXED MOUNT SCHEDULER SEED INITIALIZER
   const [schedule, setSchedule] = useState(() => {
     return buildSchedule(
       JSON.parse(localStorage.getItem("ca_hours")) || { aa_c: 160, aa_r1: 40, aa_r2: 30, cl_c: 0, cl_r1: 30, cl_r2: 20, dt_c: 180, dt_r1: 45, dt_r2: 25, it_c: 110, it_r1: 35, it_r2: 20 },
@@ -230,7 +230,7 @@ export default function App() {
     );
   });
 
-  // METRICS UPDATE WORKER LOOP
+  // METRICS BACKGROUND WORKER LOOP
   useEffect(() => {
     const generated = buildSchedule(hours, startDate, classDL, spdC, classOrder);
     setSchedule(generated);
@@ -263,7 +263,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [timerTargetDate, timerTargetTime]);
 
-  // STATE VALUE AUTOMATION CACHE PIPELINE
+  // LOCAL CACHE PIPELINE SYNC
   useEffect(() => {
     localStorage.setItem("ca_step_lock", step);
     localStorage.setItem("ca_start", startDate);
@@ -599,46 +599,46 @@ export default function App() {
 
                                 <div style={{ fontSize: "13px", fontWeight: "800", color: isDone ? "#10B981" : styleProfile.text }}>
                                   {entry.hrs} hrs
+                                </div>
+
                               </div>
-
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* DAILY LOG NOTES COMPONENT */}
-                      <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
-                          📝 End-of-Day Execution Memo:
+                            );
+                          })}
                         </div>
-                        <textarea
-                          value={dailyNotes[dIdx] || ""}
-                          onChange={(e) => handleNoteChange(dIdx, e.target.value)}
-                          placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
-                          style={{
-                            width: "100%",
-                            minHeight: "44px",
-                            padding: "8px 10px",
-                            fontSize: "12px",
-                            fontFamily: "inherit",
-                            color: "#334155",
-                            backgroundColor: "#F8FAFC",
-                            border: "1px solid #E2E8F0",
-                            borderRadius: "8px",
-                            resize: "vertical",
-                            outline: "none",
-                            boxSizing: "border-box"
-                          }}
-                        />
-                      </div>
 
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                        {/* DAILY LOG NOTES COMPONENT */}
+                        <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: "10px", marginTop: "6px" }}>
+                          <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", marginBottom: "4px" }}>
+                            📝 End-of-Day Execution Memo:
+                          </div>
+                          <textarea
+                            value={dailyNotes[dIdx] || ""}
+                            onChange={(e) => handleNoteChange(dIdx, e.target.value)}
+                            placeholder="Log conceptual gaps, pending doubt adjustments, or standard module retention notes here..."
+                            style={{
+                              width: "100%",
+                              minHeight: "44px",
+                              padding: "8px 10px",
+                              fontSize: "12px",
+                              fontFamily: "inherit",
+                              color: "#334155",
+                              backgroundColor: "#F8FAFC",
+                              border: "1px solid #E2E8F0",
+                              borderRadius: "8px",
+                              resize: "vertical",
+                              outline: "none",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       </div>
