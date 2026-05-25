@@ -489,7 +489,7 @@ export default function App() {
           {step === 2 && (
             <div>
               <div style={{ fontSize: "15px", fontWeight: "800", color: "#0F172A", marginBottom: "4px" }}>Set Class Subject Discharge Sequence</div>
-              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily subject cycling priority order below using the dynamic controllers.</p>
+              <p style={{ fontSize: "12px", color: "#64748B", marginBottom: "18px" }}>Arrange your daily subject cycling priority layout order below using the dynamic controllers.</p>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
                 {classOrder.map((id, index) => {
@@ -554,7 +554,7 @@ export default function App() {
                       return (
                         <div key={dIdx} style={{ background: "linear-gradient(90deg, #FEE2E2 0%, #FFFEFE 100%)", borderLeft: "6px solid #EF4444", borderRadius: "12px", padding: "14px", border: "1px solid #FEE2E2" }}>
                           <div style={{ fontSize: "12px", fontWeight: "800", color: "#991B1B" }}>🚨 {fmt(day.date).toUpperCase()} — Paper Venue</div>
-                          <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubY ? day.examSubj.name : subjName(day.examSubj?.id)}</div>
+                          <div style={{ fontSize: "15px", fontWeight: "800", color: "#7F1D1D", marginTop: "2px" }}>ICAI Paper: {day.examSubj ? day.examSubj.name : subjName(day.examSubj?.id)}</div>
                         </div>
                       );
                     }
