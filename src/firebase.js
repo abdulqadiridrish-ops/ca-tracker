@@ -2,18 +2,20 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
-// Note: You can create a free project at console.firebase.google.com to grab your unique config keys, 
-// but the engine will mount and simulate cleanly right away with this structure.
+// Your authentic web app's Firebase configuration pulled directly from the SDK console
 const firebaseConfig = {
-  apiKey: "AIzaSyDummyKey-For-Google-SignIn-Auth-Payload",
-  authDomain: "ca-tracker-self.firebaseapp.com",
-  projectId: "ca-tracker-self",
-  storageBucket: "ca-tracker-self.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyBu5whtaH1etp7Pf--P3CZ7_t89CxK8IVc",
+  authDomain: "ca-tracker-e31fe.firebaseapp.com",
+  projectId: "ca-tracker-e31fe",
+  storageBucket: "ca-tracker-e31fe.firebasestorage.app",
+  messagingSenderId: "39816912890",
+  appId: "1:39816912890:web:adab8a43de9c4783f60e43",
+  measurementId: "G-FF3CVP0RYD"
 };
 
+// Initialize Firebase Core Engine instance
 const app = initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
